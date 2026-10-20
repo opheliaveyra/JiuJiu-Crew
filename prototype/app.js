@@ -17,11 +17,34 @@ async function api(path, opts = {}) {
 }
 function status(msg, id='#notice'){ $(id).textContent = msg; }
 function textNode(tag, text, cls) {const el=document.createElement(tag);el.textContent=text;if(cls)el.className=cls;return el;}
-function showAuth(){ clearInterval(refreshHandle);refreshHandle=null; $('#auth').hidden=false;$('#workspace').hidden=true;$('#identity').textContent='尚未登录'; const cb=$('#credential-box');if(cb)cb.hidden=true; }
+function clearSensitiveFields(){
+  for(const selector of ['#credential-value','#token','#owner-secret','#invite-code','#invite-value']){
+    const field=$(selector);
+    if(field)field.value='';
+  }
+  const statusEl=$('#credential-copy-status');
+  if(statusEl)statusEl.textContent='';
+  const inviteStatus=$('#invite-copy-status');
+  if(inviteStatus)inviteStatus.textContent='';
+}
+function showAuth(){
+  clearInterval(refreshHandle);
+  refreshHandle=null;
+  clearSensitiveFields();
+  $('#auth').hidden=false;
+  $('#workspace').hidden=true;
+  $('#identity').textContent='尚未登录';
+  const cb=$('#credential-box');
+  if(cb)cb.hidden=true;
+  const inviteResult=$('#invite-result');
+  if(inviteResult)inviteResult.hidden=true;
+}
 async function login(t){
   token=t; const info=await api('/api/me');
   me=info.member;
   localStorage.setItem('crewToken',token);$('#auth').hidden=true;$('#workspace').hidden=false;
+  // Clear temporary login/bootstrap inputs, but preserve the new member token in its dedicated credential field.
+  for(const selector of ['#token','#owner-secret','#invite-code']){const field=$(selector);if(field)field.value='';}
   $('#identity').textContent=me.name+' · '+(me.role==='owner'?'群主':'成员');
   $('#invite-button').hidden=me.role!=='owner';
   const cb=$('#credential-box');
