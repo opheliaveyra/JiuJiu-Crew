@@ -280,7 +280,13 @@ class CrewHandler(BaseHTTPRequestHandler):
                 # Only the first account can bootstrap, using a secret set locally.
                 if not BOOTSTRAP_SECRET:
                     return self.send_json(503, {"error": "Set CREW_BOOTSTRAP_SECRET before initial registration"})
-                if not secrets.compare_digest(str(data.get("secret", "")), BOOTSTRAP_SECRET):
+                # compare_digest rejects non-ASCII str operands (TypeError), and the
+                # client controls this value: compare UTF-8 bytes so a malformed or
+                # non-ASCII secret yields 403 instead of aborting the connection.
+                if not secrets.compare_digest(
+                    str(data.get("secret", "")).encode("utf-8"),
+                    BOOTSTRAP_SECRET.encode("utf-8"),
+                ):
                     return self.send_json(403, {"error": "Invalid bootstrap secret"})
                 try:
                     db.execute("BEGIN IMMEDIATE")
