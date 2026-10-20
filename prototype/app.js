@@ -68,7 +68,28 @@ bindForm('#bootstrap-form',async()=>{const data=await api('/api/bootstrap',{meth
 bindForm('#register-form',async()=>{const data=await api('/api/register',{method:'POST',body:JSON.stringify({name:$('#new-name').value,invite:$('#invite-code').value.trim()})});await login(data.token);status('注册成功。请安全保存成员凭证。');});
 bindForm('#room-form',async()=>{const info=await api('/api/rooms',{method:'POST',body:JSON.stringify({name:$('#room-name').value})});$('#room-name').value='';room=info.room.id;await loadRooms();await loadMessages();});
 bindForm('#message-form',async()=>{const body=$('#message-input').value.trim();await api('/api/rooms/'+room+'/messages',{method:'POST',body:JSON.stringify({body})});$('#message-input').value='';await loadMessages();status('已发送。@提醒将写入对应成员的信箱。');});
-$('#invite-button').onclick=async()=>{try{const result=await api('/api/invites',{method:'POST',body:'{}'});$('#invite-result').textContent='一次性邀请码：'+result.invite+'（请安全交给成员）';}catch(e){status(e.message);}};
+async function copyInvite(){
+  const input = $('#invite-value');
+  if(!input.value)return;
+  let copied = false;
+  if(navigator.clipboard?.writeText){
+    try{await navigator.clipboard.writeText(input.value);copied=true;}catch(error){/* Offer a fallback. */}
+  }
+  if(!copied){
+    input.focus();input.select();
+    try{copied=Boolean(document.execCommand('copy'));}catch(error){copied=false;}
+  }
+  $('#invite-copy-status').textContent = copied ? '✅ 邀请码已复制，可以交给需要注册的成员。' : '浏览器禁止自动复制，邀请码已选中，请按 Ctrl+C 复制。';
+}
+$('#invite-copy-button').onclick=copyInvite;
+$('#invite-button').onclick=async()=>{
+  try{
+    const result=await api('/api/invites',{method:'POST',body:'{}'});
+    $('#invite-value').value=result.invite;
+    $('#invite-result').hidden=false;
+    $('#invite-copy-status').textContent='邀请码仅能使用一次，请点击「复制邀请码」交给成员。';
+  }catch(e){status(e.message);}
+};
 $('#assemble-button').onclick=async()=>{const topic=prompt('本次集结讨论什么主题？');if(!topic?.trim())return;try{const result=await api('/api/rooms/'+room+'/assemble',{method:'POST',body:JSON.stringify({body:topic})});await loadMessages();status('集结消息已写入 '+result.queued_for+' 位成员的信箱。未执行外部会话唤醒。');}catch(e){status(e.message);}};
 $('#logout').onclick=()=>{localStorage.removeItem('crewToken');token='';me=null;showAuth();};
 if(token) login(token).catch(e=>{status(e.message,'#auth-tip');showAuth();});
