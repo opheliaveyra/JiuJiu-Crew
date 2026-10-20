@@ -17,13 +17,38 @@ async function api(path, opts = {}) {
 }
 function status(msg, id='#notice'){ $(id).textContent = msg; }
 function textNode(tag, text, cls) {const el=document.createElement(tag);el.textContent=text;if(cls)el.className=cls;return el;}
-function showAuth(){ clearInterval(refreshHandle);refreshHandle=null; $('#auth').hidden=false;$('#workspace').hidden=true;$('#identity').textContent='尚未登录'; }
+function clearSensitiveFields(){
+  for(const selector of ['#credential-value','#token','#owner-secret','#invite-code','#invite-value']){
+    const field=$(selector);
+    if(field)field.value='';
+  }
+  const statusEl=$('#credential-copy-status');
+  if(statusEl)statusEl.textContent='';
+  const inviteStatus=$('#invite-copy-status');
+  if(inviteStatus)inviteStatus.textContent='';
+}
+function showAuth(){
+  clearInterval(refreshHandle);
+  refreshHandle=null;
+  clearSensitiveFields();
+  $('#auth').hidden=false;
+  $('#workspace').hidden=true;
+  $('#identity').textContent='尚未登录';
+  const cb=$('#credential-box');
+  if(cb)cb.hidden=true;
+  const inviteResult=$('#invite-result');
+  if(inviteResult)inviteResult.hidden=true;
+}
 async function login(t){
   token=t; const info=await api('/api/me');
   me=info.member;
   localStorage.setItem('crewToken',token);$('#auth').hidden=true;$('#workspace').hidden=false;
+  // Clear temporary login/bootstrap inputs, but preserve the new member token in its dedicated credential field.
+  for(const selector of ['#token','#owner-secret','#invite-code']){const field=$(selector);if(field)field.value='';}
   $('#identity').textContent=me.name+' · '+(me.role==='owner'?'群主':'成员');
   $('#invite-button').hidden=me.role!=='owner';
+  const cb=$('#credential-box');
+  if(cb){$('#credential-value').value=token;$('#credential-copy-status').textContent='服务器只保存凭证的哈希，丢了无法找回。请复制到安全的地方。';cb.hidden=false;}
   lastInbox=0;
   await loadRooms();await loadMembers();await loadMessages();await loadInbox();
   clearInterval(refreshHandle);
@@ -82,6 +107,20 @@ async function copyInvite(){
   $('#invite-copy-status').textContent = copied ? '✅ 邀请码已复制，可以交给需要注册的成员。' : '浏览器禁止自动复制，邀请码已选中，请按 Ctrl+C 复制。';
 }
 $('#invite-copy-button').onclick=copyInvite;
+async function copyCredential(){
+  const input = $('#credential-value');
+  if(!input.value)return;
+  let copied = false;
+  if(navigator.clipboard?.writeText){
+    try{await navigator.clipboard.writeText(input.value);copied=true;}catch(error){/* Offer a fallback. */}
+  }
+  if(!copied){
+    input.focus();input.select();
+    try{copied=Boolean(document.execCommand('copy'));}catch(error){copied=false;}
+  }
+  $('#credential-copy-status').textContent = copied ? '✅ 凭证已复制，请保存到密码管理器或安全位置。' : '浏览器禁止自动复制，凭证已选中，请按 Ctrl+C 复制。';
+}
+$('#credential-copy-button').onclick=copyCredential;
 $('#invite-button').onclick=async()=>{
   try{
     const result=await api('/api/invites',{method:'POST',body:'{}'});
